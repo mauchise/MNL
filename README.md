@@ -1,22 +1,22 @@
-# Morf 规范
+# Morf 规范 (Morf Specification)
 
-Morf 是一种极简且通用的树形数据结构。它的设计哲学是：**万物皆 Stage**。通过一种统一的结构来描述一切，Morf 为领域特定语言 (DSL)、配置文件和数据交换格式提供了一个简单而强大的基础。
+Morf 是一种极简且通用的树形数据结构。其核心设计哲学是：**万物皆 Stage**。通过这一统一的抽象，Morf 为领域特定语言 (DSL)、配置文件和数据交换格式提供了一个简单、一致且功能强大的基础。
 
-Morf Notation Language (MNL) 是 Morf 数据结构的统一文本表示法，旨在实现人类可读、机器可解析的目标。
+Morf Notation Language (MNL) 是 Morf 数据结构的规范文本表示法，旨在实现极致的人类可读性与机器可解析性。
 
-## 1. Morf：核心数据结构
+## 1. Morf: 核心数据结构
 
-Morf 的世界里只存在一种构建块，即 **Stage**。任何复杂的结构都是由 Stage 嵌套组合而成。
+Morf 的世界中仅存在一种构建单元，即 **Stage**。任何复杂的结构都是由 Stage 嵌套组合而成。
 
 ### 1.1. Stage 的定义
 
 一个 Stage 由三个部分组成：
 
--   `id` (`string`): **类型标识符**。用于标记一个 Stage 的类型或意图，例如 `div`, `user`, `@name`。
--   `payload` (`any`): **载荷**。用于承载基元值，例如字符串、数字、布尔值等。如果一个 Stage 仅用于组织结构，其 payload 可以为空。
+-   `id` (`string`): **类型标识符**。用于标记一个 Stage 的类型或意图，例如 `div`, `user`, `host`。
+-   `payload` (`any`): **载荷**。用于承载基元值，如字符串、数字等。如果一个 Stage 仅用于组织结构，其 payload 可以为空。
 -   `stages` (`Stage[]`): **子节点列表**。一个有序的 Stage 列表，用于构建层级结构。
 
-一个典型的 Stage 可以用以下伪代码表示：
+一个 Stage 的抽象表示如下：
 
 ```typescript
 interface Stage {
@@ -26,28 +26,88 @@ interface Stage {
 }
 ```
 
-例如，一个表示纯文本的 Stage 可以是：
+## 2. Morf Notation Language (MNL): 文本表示法
 
-```json
-{
-  "id": "text-literal",
-  "payload": "hello world",
-  "stages": []
+MNL 是 Morf 结构的文本化语言。它的语法被设计为最小化的，同时通过可扩展的解析规则支持无限的表达能力。
+
+### 2.1. 基础词法 (Lexical Elements)
+
+#### 2.1.1. Stage ID
+
+一个 Stage `id` 是用于标识 Stage 类型的字符序列。
+
+-   **构成**：`id` 可以包含除**分隔符**之外的任何字符。
+-   **分隔符 (Delimiters)**：以下字符在语法上有特殊含义，因此会终止一个 `id` 的解析：
+    -   **空白符**：空格 (` `)、制表符 (`\t`)、换行符 (`\n`, `\r`)。
+    -   **结构符**：`{`, `}`, `:`。
+-   **转义 (Escaping)**：若 `id` 必须包含上述结构符，必须使用反斜杠 `\` 进行转义。
+
+| 期望的 ID | 在 MNL 中的表示 |
+| :--- | :--- |
+| `my-id` | `my-id` |
+| `path/to/file`| `path/to/file` |
+| `config:dev` | `config\:dev` |
+
+#### 2.1.2. 空白符 (Whitespace)
+
+-   空格、制表符和换行符被视为空白符。
+-   空白符用于分隔**同级的 Stage**。
+-   连续的多个空白符等同于一个。
+-   **缩进没有语法意义**，仅用于提高可读性。
+
+#### 2.1.3. 注释 (Comments)
+
+-   以 `;` (分号) 开头的行被视为单行注释。
+-   解析器会完全忽略从 `;` 到行尾的所有内容。
+
+### 2.2. 核心语法 (Core Syntax)
+
+一个 Stage 由一个 `id` 和紧随其后的子 Stage 容器组成。定义子 Stage 只有以下两种方式：
+
+#### 2.2.1. 块容器 (Block Container)
+
+使用花括号 `{}` 包裹**零个或多个**子 Stage。这是定义多个子 Stage 的标准方式。
+
+`[id] { [child1] [child2] ... }`
+
+```mnl
+; 一个有多个子 Stage 的 Stage
+user {
+  profile
+  settings
 }
+
+; 一个没有子 Stage 的 Stage
+empty-node {}
 ```
 
-## 2. Morf Notation Language (MNL)：统一文本表示
+#### 2.2.2. 单一容器 (Single Container)
 
-MNL 是 Morf 结构的文本化语言。它的语法核心极度精简，但通过可扩展的解析规则，能够优雅地表达丰富的数据结构。
+使用冒号 `:` 指定**唯一一个**子 Stage。这是 `[id] { [child] }` 的语法简写。
 
-### 2.1. 基础语法
+`[id]: [child]`
 
-#### 2.1.1. Stage 表达式
+```mnl
+user: profile
+```
+**重要**: 一个 Stage ID 后面只能跟随一种容器 (`{}` 或 `:`)。`[id] [child] { ... }` 这样的混合语法是**无效的**。
 
-一个 Stage 的基本表达形式为：`[id] { [children] }`
+### 2.3. 可扩展性与模式
 
--   `[id]` 是 Stage 的 `id`。
--   花括号 `{}` 用于包裹所有的子 Stage (`stages` 列表)。子 Stage 之间用空格分隔。
+MNL 的核心语法不直接定义字符串、数字等字面量。这些是通过**自定义解析规则**来实现的。
+
+#### 2.3.1. 字面量与 Payload
+
+当解析器在流中遇到一个不符合核心语法的 token 时，它会尝试使用一系列**自定义字面量解析器**去匹配。
+
+*为方便下文展示，我们约定用 `type(payload)` 的形式来表示解析后生成的、带有载荷的 Stage。*
+
+#### 2.3.2. 表达键值对：模式与约定
+
+MNL 的树形结构天然支持键值对模式。
+
+**通用模式 (General Pattern):**
+最直接的模式是使用 `id` 作为“键”，其子 Stage 作为“值”。
 
 ```mnl
 database {
@@ -57,61 +117,27 @@ database {
 }
 ```
 
-#### 2.1.2. 语法简写
+**属性约定 (`@` Convention):**
+在需要同时表达**属性 (Attributes)**和**子元素 (Child Elements)**的场景下（类似 XML/HTML），我们推荐使用 `@` 前缀来区分“属性”。
 
-如果一个 Stage 只有一个子 Stage，可以使用冒号 `:` 来代替花括号，使结构更紧凑。
-
-`[id]: [child]` 等价于 `[id] { [child] }`
-
-例如，上面的 `database` 示例可以写成：
+根据核心语法，**属性也是子 Stage**，它们必须和其它子 Stage 一样，被放置在同一个容器中。
 
 ```mnl
-database {
-  host: "localhost"
-  port: 5432
-  user: "admin"
+; 一个类似 HTML 元素的 Stage
+div {
+  ; 属性和子元素都是 div 的子 Stage
+  @id: "main-content"
+  @class: "container"
+
+  h1: "Welcome to Morf"
+  p: "A new era of data representation."
 }
 ```
+这种方式完美遵循了“万物皆 Stage”的哲学，并保持了语法的绝对一致性。
 
-### 2.2. 超越语法：自定义解析与语义约定
+### 3. 实践示例
 
-MNL 的核心语法并不包含字符串、数字等字面量的定义。这些是由 **自定义解析规则** 提供的。解析器可以定义规则来识别特定模式（如 `"..."` 或 `123`），将其吞噬，并返回一个带有 `payload` 的 Stage。
-
-这种设计将 **结构语法** 与 **词法解析** 分离，赋予了 MNL 极大的灵活性。
-
-#### 2.2.1. 字面量解析
-
-通过配置解析器，我们可以轻松支持常见的字面量。例如，解析器可以添加以下规则：
-
--   识别 `"..."` 形式的文本，生成 `{ id: "text-literal", payload: "..." }`。
--   识别 `123` 或 `3.14` 形式的数字，生成 `{ id: "number-literal", payload: ... }`。
-
-*为了方便下文展示，我们约定用 `id(payload)` 的形式来表示解析后生成的、带有载荷的 Stage。*
-
-#### 2.2.2. 键值对的表达（约定）
-
-MNL 本身是一个树形结构，没有内置“键值对”的概念。然而，我们可以通过 **约定** 来优雅地表达它。
-
-我们推荐使用以 `@` 符号开头的 `id` 来表示“属性”或“字段名”，它的子 Stage 则是“值”。这种方式直观且符合许多现有语言的习惯。
-
-```mnl
-human name: "John Doe" age: 30
-```
-
-这段 MNL 会被解析为如下的 Morf 结构：
-
-```
-human {
-  name: text-literal("John Doe")
-  age: number-literal(30)
-}
-```
-
-## 3. 实践示例
-
-以下示例展示了 MNL 如何在不同场景下描述数据。
-
-### 3.1. 表达一个数字列表
+#### 3.1. 表达一个数字列表
 
 ```mnl
 my-list {
@@ -119,79 +145,49 @@ my-list {
 }
 ```
 
-解析后的 Morf 结构：
-
-```
-my-list {
-  number-literal(1)
-  number-literal(2)
-  number-literal(3)
-  number-literal(4)
-  number-literal(5)
-}
-```
-
-### 3.2. 表达一个用户信息
+#### 3.2. 表达一个复杂的配置文件
 
 ```mnl
-user {
-  id: 1001
-  username: "morf-user"
-  email: "user@example.com"
-  is-active: true
-  roles {
-    role: "admin"
-    role: "editor"
+; 服务配置
+service {
+  name: "api-gateway"
+  port: 8080
+  debug-mode: true
+
+  database {
+    host: "db.internal"
+    user: "gateway_user"
   }
 }
 ```
 
-解析后的 Morf 结构：
-
-```
-user {
-  id: number-literal(1001)
-  username: text-literal("morf-user")
-  email: text-literal("user@example.com")
-  is-active: boolean-literal(true)
-  roles {
-    role: text-literal("admin")
-    role: text-literal("editor")
-  }
-}
-```
-
-### 3.3. 表达一个 SVG 元素
-
-MNL 非常适合描述像 HTML/XML 这样的标记语言。
+#### 3.3. 表达一个 SVG 元素 (使用 `@` 约定)
 
 ```mnl
 g {
   @id: "my-group"
   @fill: "blue"
   @stroke: "black"
-  @stroke-width: "3"
-  @transform: "translate(50, 50)"
-  @opacity: "0.8" 
 
-  rect { 
-    @x: "0" @y: "0"
-    @width: "100" @height: "60"
+  rect {
+    @x: 0 
+    @y: 0 
+    @width: 100 
+    @height: 60
   }
+  
   circle {
-    @cx: "100" @cy: "60"
-    @r: "40" @fill: "red"
+    @cx: 100 
+    @cy: 60 
+    @r: 40 
+    @fill: "red"
   }
 }
 ```
 
-这清晰地表达了一个包含矩形和圆形的 SVG 组，所有属性都通过 `@` 约定来表示。
+### 4. 核心设计哲学
 
-## 4. 核心设计哲学
-
-1.  **统一的结构 (Stage)**：所有数据，无论简单还是复杂，都由 Stage 构成。这提供了概念上的一致性。
-2.  **最小化的语法**：MNL 的核心语法只定义了如何组织 Stage 树。它不关心“值”的具体形态。
-3.  **强大的可扩展性**：通过自定义解析规则，Morf 可以适应任何领域，从简单的配置文件到复杂的领域特定语言。
-4.  **约定优于配置**：像 `@` 这样的键值对表示法是一种社区约定，而非语言的强制规定，保持了核心的灵活性。
-
-Morf 致力于成为构建未来数据表示和语言的通用基石。
+1.  **统一的结构 (Unified Structure)**：万物皆 Stage。这种单一的抽象降低了复杂性，并提供了概念上的一致性。
+2.  **最小化的核心语法 (Minimalist Core Syntax)**：MNL 的核心语法只定义如何组织 Stage 树，不关心“值”的具体形态，从而保持了简单和稳定。
+3.  **语法与语义的分离 (Separation of Syntax and Semantics)**：通过将字面量解析委托给自定义规则，Morf 实现了结构（语法）与内容（语义）的解耦，这赋予了它无与伦比的灵活性。
+4.  **约定优于强制 (Convention over Prescription)**：像 `@` 这样的属性表示法是解决特定问题的社区约定，而非语言的强制规定，这在提供便利性的同时保留了核心的通用性。
