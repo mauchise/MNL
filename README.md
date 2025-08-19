@@ -185,9 +185,79 @@ g {
 }
 ```
 
-### 4. 核心设计哲学
+### 4. 可能的应用方向
+#### 4.1 自定义编程语言
+MNL 的语法可以以低语法噪音的表达编程语言逻辑。
+```mnl
+define: factorial @params: n {
+  if @cond { n <= 1 }: 1
+  else { n * factorial { n - 1 } }
+}
+```
 
-1.  **统一的结构 (Unified Structure)**：万物皆 Stage。这种单一的抽象降低了复杂性，并提供了概念上的一致性。
-2.  **最小化的核心语法 (Minimalist Core Syntax)**：MNL 的核心语法只定义如何组织 Stage 树，不关心“值”的具体形态，从而保持了简单和稳定。
-3.  **语法与语义的分离 (Separation of Syntax and Semantics)**：通过将字面量解析委托给自定义规则，Morf 实现了结构（语法）与内容（语义）的解耦，这赋予了它无与伦比的灵活性。
-4.  **约定优于强制 (Convention over Prescription)**：像 `@` 这样的属性表示法是解决特定问题的社区约定，而非语言的强制规定，这在提供便利性的同时保留了核心的通用性。
+#### 4.2 UI 布局描述
+MNL 的层级结构天然地契合 UI 组件树的结构。
+
+```mnl
+window @title: "登录" {
+  vbox @spacing: 10 {
+    label: "用户名"
+    input: @id: username
+
+    label: "密码"
+    password_input: @id: password
+
+    hbox @align: right {
+      button: "取消"
+      button { @primary: true "登录" }
+    }
+  }
+}
+```
+
+#### 4.3 场景图或实体定义
+游戏引擎中的场景或 Prefab 可以用 MNL 来描述，方便人类阅读和编辑。
+
+```mnl
+entity: Player#1 {
+  component: Transform {
+    position: List { 0 1.8 0 }
+    rotation: List { 0 0 0 }
+  }
+  component: CharacterController {
+    speed: 5.0
+    jump_force: 10.0
+  }
+  component: MeshRenderer {
+    mesh: "player_model.obj"
+    material: "player_material"
+  }
+}
+```
+
+#### 4.4 工作流或流程定义
+```mnl
+pipeline @name: "Web App CI" {
+  trigger { on_push @branch: "main" }
+
+  stage: "Build" {
+    job "Compile & Bundle" {
+      runner: "ubuntu-latest"
+      steps {
+        checkout
+        run: "pnpm install"
+        run: "pnpm build"
+      }
+    }
+  }
+
+  stage: "Deploy" {
+    job "Publish to Production" {
+      runner: "ubuntu-latest"
+      steps {
+        deploy { @target: "production_server" }
+      }
+    }
+  }
+}
+```
